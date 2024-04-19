@@ -1,0 +1,222 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+
+Human data
+human_data = pd.read_table("human.txt")
+human_data
+
+#checking balance in data
+human_data['class'].value_counts().sort_index().plot.bar()
+
+Chimpanzee data
+chimp_data = pd.read_table('chimpanzee.txt')
+chimp_data
+
+chimp_data['class'].value_counts().sort_index().plot.bar()
+
+
+Dog data
+dog_data = pd.read_table('dog.txt')
+dog_data
+
+dog_data['class'].value_counts().sort_index().plot.bar()
+
+
+Encoding using k-mer counting
+#function to convert sequence into k-mer words
+#if k = 6, they are called hexamers
+def getKmers(sequence,size = 6):
+    return [sequence[x:x+size] for x in range(len(sequence)-size+1)]
+
+#converting sequences into words
+human_data['words'] = human_data.apply(lambda x: getKmers(x['sequence']),axis = 1)
+human_data = human_data.drop('sequence',axis = 1)
+human_data
+
+
+#making list of words into sentences
+human_texts = list(human_data['words'])
+for i in range(len(human_texts)):
+    human_texts[i] = ' '.join(human_texts[i])
+print(human_texts[0])
+
+
+
+#class labels data
+y_data = human_data.iloc[:,0].values
+y_data
+
+
+#bag of words using CountVectorizer()
+from sklearn.feature_extraction.text import CountVectorizer
+cv = CountVectorizer(ngram_range=(4,4))
+X = cv.fit_transform(human_texts)
+X.shape
+
+
+
+chimp_data['words'] = chimp_data.apply(lambda x: getKmers(x['sequence']), axis=1)
+chimp_texts = list(chimp_data['words'])
+for item in range(len(chimp_texts)):
+    chimp_texts[item] = ' '.join(chimp_texts[item])
+X_chimp = cv.transform(chimp_texts)
+y_chimp = chimp_data.iloc[:, 1].values 
+print(X_chimp.shape,y_chimp.shape)
+
+
+dog_data['words'] = dog_data.apply(lambda x: getKmers(x['sequence']), axis=1)
+dog_texts = list(dog_data['words'])
+for item in range(len(dog_texts)):
+    dog_texts[item] = ' '.join(dog_texts[item])
+X_dog = cv.transform(dog_texts)
+y_dog = dog_data.iloc[:, 1].values
+print(X_dog.shape,y_dog.shape)
+
+
+
+Train Test Split
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X,y_data,test_size = 0.20, random_state=42)
+print(X_train.shape,X_test.shape)
+
+
+Models
+from sklearn.metrics import accuracy_score
+
+
+Logistis regression
+# Logistic Regression
+from sklearn.linear_model import LogisticRegression
+model=LogisticRegression()
+model.fit(X_train,y_train)
+y_pred=model.predict(X_test)
+y_pred_c=model.predict(X_chimp)
+y_pred_d=model.predict(X_dog)
+print("Accuracy on human data is {}".format(accuracy_score(y_test,y_pred)*100))
+print("Accuracy on chimp data is {}".format(accuracy_score(y_chimp,y_pred_c)*100))
+print("Accuracy on dog data is {}".format(accuracy_score(y_dog,y_pred_d)*100))
+
+>>>Accuracy on human data is 93.94977168949772
+Accuracy on chimp data is 99.22711058263971
+Accuracy on dog data is 90.97560975609757
+
+
+plt.figure(figsize=(7,6))
+sns_plot = sns.heatmap(pd.crosstab(pd.Series(y_test, name='Actual'), pd.Series(y_pred, name='Predicted')),cmap="YlGnBu",annot=True,fmt='d')
+sns_plot.set_title('Logistic Regression')
+
+
+
+Random forest classifier
+from sklearn.ensemble import RandomForestClassifier
+model=RandomForestClassifier()
+model.fit(X_train,y_train)
+y_pred=model.predict(X_test)
+y_pred_c=model.predict(X_chimp)
+y_pred_d=model.predict(X_dog)
+print("Accuracy on human data is {}".format(accuracy_score(y_test,y_pred)*100))
+print("Accuracy on chimp data is {}".format(accuracy_score(y_chimp,y_pred_c)*100))
+print("Accuracy on dog data is {}".format(accuracy_score(y_dog,y_pred_d)*100))
+
+>>> Accuracy on human data is 92.00913242009132
+Accuracy on chimp data is 98.69203329369797
+Accuracy on dog data is 84.51219512195122
+
+
+plt.figure(figsize=(7,6))
+sns_plot = sns.heatmap(pd.crosstab(pd.Series(y_test, name='Actual'), pd.Series(y_pred, name='Predicted')),cmap="YlGnBu",annot=True,fmt='d')
+sns_plot.set_title('Random Forest')
+
+
+K neighbour classifier
+from sklearn.neighbors import KNeighborsClassifier
+model=KNeighborsClassifier()
+model.fit(X_train,y_train)
+y_pred=model.predict(X_test)
+y_pred_c=model.predict(X_chimp)
+y_pred_d=model.predict(X_dog)
+print("Accuracy on human data is {}".format(accuracy_score(y_test,y_pred)*100))
+print("Accuracy on chimp data is {}".format(accuracy_score(y_chimp,y_pred_c)*100))
+print("Accuracy on dog data is {}".format(accuracy_score(y_dog,y_pred_d)*100))
+
+>>> Accuracy on human data is 82.42009132420091
+Accuracy on chimp data is 94.23305588585018
+Accuracy on dog data is 47.3170731707317
+
+
+
+lt.figure(figsize=(7,6))
+sns_plot = sns.heatmap(pd.crosstab(pd.Series(y_test, name='Actual'), pd.Series(y_pred, name='Predicted')),cmap="YlGnBu",annot=True,fmt='d')
+sns_plot.set_title('KNN')
+
+
+
+Decision tree classifier
+from sklearn.tree import DecisionTreeClassifier
+model=DecisionTreeClassifier()
+model.fit(X_train,y_train)
+y_pred=model.predict(X_test)
+y_pred_c=model.predict(X_chimp)
+y_pred_d=model.predict(X_dog)
+print("Accuracy on human data is {}".format(accuracy_score(y_test,y_pred)*100))
+print("Accuracy on chimp data is {}".format(accuracy_score(y_chimp,y_pred_c)*100))
+print("Accuracy on dog data is {}".format(accuracy_score(y_dog,y_pred_d)*100))
+
+>>> Accuracy on human data is 82.07762557077626
+Accuracy on chimp data is 90.1307966706302
+Accuracy on dog data is 46.21951219512195
+
+
+
+plt.figure(figsize=(7,6))
+sns_plot = sns.heatmap(pd.crosstab(pd.Series(y_test, name='Actual'), pd.Series(y_pred, name='Predicted')),cmap="YlGnBu",annot=True,fmt='d')
+sns_plot.set_title('Decision Tree')
+
+
+
+SVM
+from sklearn.svm import SVC 
+model=SVC(kernel="linear")
+model.fit(X_train,y_train)
+y_pred=model.predict(X_test)
+y_pred_c=model.predict(X_chimp)
+y_pred_d=model.predict(X_dog)
+print("Accuracy on human data is {}".format(accuracy_score(y_test,y_pred)*100))
+print("Accuracy on chimp data is {}".format(accuracy_score(y_chimp,y_pred_c)*100))
+print("Accuracy on dog data is {}".format(accuracy_score(y_dog,y_pred_d)*100))
+
+>>> Accuracy on human data is 91.32420091324201
+Accuracy on chimp data is 98.5731272294887
+Accuracy on dog data is 79.75609756097562
+
+
+plt.figure(figsize=(7,6))
+sns_plot = sns.heatmap(pd.crosstab(pd.Series(y_test, name='Actual'), pd.Series(y_pred, name='Predicted')),cmap="YlGnBu",annot=True,fmt='d')
+sns_plot.set_title('SVM')
+
+
+
+
+Multinomial Naive bayes
+from sklearn.naive_bayes import MultinomialNB
+model = MultinomialNB(alpha = 0.1)
+model.fit(X_train,y_train)
+y_pred=model.predict(X_test)
+y_pred_c=model.predict(X_chimp)
+y_pred_d=model.predict(X_dog)
+print("Accuracy on human data is {}".format(accuracy_score(y_test,y_pred)*100))
+print("Accuracy on chimp data is {}".format(accuracy_score(y_chimp,y_pred_c)*100))
+print("Accuracy on dog data is {}".format(accuracy_score(y_dog,y_pred_d)*100))
+
+>> Accuracy on human data is 98.40182648401826
+Accuracy on chimp data is 99.346016646849
+Accuracy on dog data is 92.5609756097561
+
+
+
+plt.figure(figsize=(7,6))
+sns_plot = sns.heatmap(pd.crosstab(pd.Series(y_test, name='Actual'), pd.Series(y_pred, name='Predicted')),cmap="YlGnBu",annot=True,fmt='d')
+sns_plot.set_title('Naive Bayes')
