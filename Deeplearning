@@ -1,0 +1,493 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import requests
+
+
+Human data
+human_dna_seq_url = 'https://raw.githubusercontent.com/pk13041991/DNA-SEQUENCING/master/deep-learning-genomics-primer-master/deep-learning-genomics-primer-master/sequences.txt'
+human_dna_sequences = requests.get(human_dna_seq_url).text.split('\n')
+#last sequence in dataset is empty, hence we remove it
+human_dna_sequences.pop()
+#human_dna_sequences = list(filter(None, human_dna_sequences))
+pd.DataFrame(human_dna_sequences)
+
+
+
+gene_family_url = 'https://raw.githubusercontent.com/pk13041991/DNA-SEQUENCING/master/hlabel.txt'
+gene_labels = requests.get(gene_family_url).text.split('\n')
+#last label in dataset is empty, hence we remove it
+gene_labels.pop()
+#gene_labels = list(filter(None, gene_labels))  # removes empty values
+pd.DataFrame(gene_labels)
+
+
+
+Chimapnzee data
+SEQUENCES_URL = 'https://raw.githubusercontent.com/pk13041991/DNA-SEQUENCING/master/chimpsequences.txt'
+sequences = requests.get(SEQUENCES_URL).text.split('\n')
+sequences = list(filter(None, sequences))  # This removes empty sequences.
+# Let's print the first few sequences.
+pd.DataFrame(sequences, columns=['Sequences'])
+
+
+LABELS_URL = 'https://raw.githubusercontent.com/pk13041991/DNA-SEQUENCING/master/chimplabel.txt'
+labels = requests.get(LABELS_URL).text.split('\r\n')
+labels = list(filter(None, labels))  # removes empty sequences
+pd.DataFrame(labels)
+
+
+
+Dog data
+SEQUENCES_URL = 'https://raw.githubusercontent.com/pk13041991/DNA-SEQUENCING/master/dogsequences.txt'
+sequences = requests.get(SEQUENCES_URL).text.split('\n')
+sequences = list(filter(None, sequences))  # This removes empty sequences.
+# Let's print the first few sequences.
+pd.DataFrame(sequences)
+
+
+LABELS_URL = 'https://raw.githubusercontent.com/pk13041991/DNA-SEQUENCING/master/doglabel.txt'
+labels = requests.get(LABELS_URL).text.split('\r\n')
+labels = list(filter(None, labels))  # removes empty sequences
+pd.DataFrame(labels)
+
+
+
+Data preprocessing
+Human (A)
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+
+1) #encoding the sequences
+label_encoder = LabelEncoder()  
+one_hot_encoder = OneHotEncoder(categories='auto')   
+encoded_sequences = []
+
+for sequence in human_dna_sequences:
+  label_encoded = label_encoder.fit_transform(list(sequence))
+  label_encoded = np.array(label_encoded).reshape(-1, 1)
+  one_hot_encoded = one_hot_encoder.fit_transform(label_encoded)
+  encoded_sequences.append(one_hot_encoded.toarray())
+
+np.set_printoptions(threshold=40)
+encoded_sequences = np.stack(encoded_sequences)
+print("Example sequence\n-----------------------")
+print('DNA Sequence #1:\n',human_dna_sequences[0])
+print('One hot encoding of Sequence #1:\n',encoded_sequences[0])
+
+
+2)#encoding the gene family labels
+one_hot_encoder = OneHotEncoder(categories='auto')
+gene_labels = np.array(gene_labels).reshape(-1, 1)
+encoded_labels = one_hot_encoder.fit_transform(gene_labels).toarray()
+
+print('Labels:\n',gene_labels)
+print('One-hot encoded labels:\n',encoded_labels)
+
+
+chimpanzee (B)
+1) integer_encoder = LabelEncoder()  
+one_hot_encoder = OneHotEncoder(categories='auto')   
+input_features = []
+
+for sequence in sequences:
+  integer_encoded = integer_encoder.fit_transform(list(sequence))
+  integer_encoded = np.array(integer_encoded).reshape(-1, 1)
+  one_hot_encoded = one_hot_encoder.fit_transform(integer_encoded)
+  input_features.append(one_hot_encoded.toarray())
+
+np.set_printoptions(threshold=40)
+chimp_sequences = np.stack(input_features)
+print("Example sequence\n")
+print('DNA Sequence #1:\n',sequences[0][:10],'...',sequences[0][-10:])
+print('One hot encoding of Sequence #1:\n',chimp_sequences[0])
+
+
+2) one_hot_encoder = OneHotEncoder(categories='auto')
+labels = np.array(labels).reshape(-1, 1)
+chimp_labels = one_hot_encoder.fit_transform(labels).toarray()
+
+print('Labels:\n',labels)
+print('One-hot encoded labels:\n',chimp_labels)
+
+
+Dog (C)
+1) integer_encoder = LabelEncoder()  
+one_hot_encoder = OneHotEncoder(categories='auto')   
+input_features = []
+
+for sequence in sequences:
+  integer_encoded = integer_encoder.fit_transform(list(sequence))
+  integer_encoded = np.array(integer_encoded).reshape(-1, 1)
+  one_hot_encoded = one_hot_encoder.fit_transform(integer_encoded)
+  input_features.append(one_hot_encoded.toarray())
+
+np.set_printoptions(threshold=40)
+dog_sequences = np.stack(input_features)
+print("Example sequence\n-----------------------")
+print('DNA Sequence #1:\n',sequences[0][:10],'...',sequences[0][-10:])
+print('One hot encoding of Sequence #1:\n',dog_sequences[0].T)
+
+one_hot_encoder = OneHotEncoder(categories='auto')
+labels = np.array(labels).reshape(-1, 1)
+dog_labels = one_hot_encoder.fit_transform(labels).toarray()
+
+print('Labels:\n',labels.T)
+print('One-hot encoded labels:\n',dog_labels.T)
+
+
+Train test split
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(
+    encoded_sequences, encoded_labels, test_size=0.25, random_state=42)
+print(X_train.shape,y_train.shape)
+print(X_test.shape,y_test.shape)
+
+
+
+CNN Model creation
+from keras.layers import Conv1D, Dense, MaxPooling1D, Flatten
+from keras.models import Sequential
+model = Sequential()
+model.add(Conv1D(filters=32, kernel_size=12, 
+                 input_shape=(X_train.shape[1], 4)))
+model.add(MaxPooling1D(pool_size=4))
+model.add(Dense(32, activation='relu'))
+model.add(MaxPooling1D(pool_size=4))
+model.add(Flatten())
+model.add(Dense(16, activation='relu'))
+model.add(Dense(7, activation='softmax'))
+model.compile(loss='binary_crossentropy', optimizer='adam', 
+              metrics=['binary_accuracy'])
+model.summary()
+
+
+Training the CNN model
+#cnn = model.fit(X_train, y_train, epochs=50, validation_split=0.25)
+cnn = model.fit(X_train, y_train, epochs=50, validation_data=(X_test, y_test))
+
+
+
+
+CNN Model evaluation
+plt.figure()
+plt.plot(cnn.history['binary_accuracy'])
+plt.plot(cnn.history['val_binary_accuracy'])
+plt.title('cnn model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'validation'])
+plt.show()
+
+
+plt.figure()
+plt.plot(cnn.history['loss'])
+plt.plot(cnn.history['val_loss'])
+plt.title('cnn model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'validation'])
+plt.show()
+
+
+loss, accuracy = model.evaluate(X_train, y_train)
+print("Train loss:", loss)
+print("Train accuracy:", accuracy)
+loss, accuracy = model.evaluate(X_test, y_test)
+print("Test loss:", loss)
+print("Test accuracy:", accuracy)
+
+
+
+Evaluating CNN on chimp data
+loss, accuracy = model.evaluate(chimp_sequences, chimp_labels)
+print("Test loss:", loss)
+print("Test accuracy:", accuracy*100)
+
+
+Evaluating CNN on Dog data
+loss, accuracy = model.evaluate(dog_sequences, dog_labels)
+print("Test loss:", loss)
+print("Test accuracy:", accuracy)
+
+
+
+
+LSTM model creation
+from keras.models import Sequential
+from keras.layers import LSTM, Dense, MaxPooling1D, Flatten
+# Create a Sequential model
+model = Sequential()
+# Add the LSTM layer
+model.add(LSTM(units=32, input_shape=(X_train.shape[1], 4)))
+model.add(Dense(32, activation='relu'))
+model.add(Flatten())
+#model.add(Dense(16, activation='relu'))
+model.add(Dense(7, activation='softmax'))
+model.compile(loss='binary_crossentropy', optimizer='adam', 
+              metrics=['binary_accuracy'])
+model.summary()
+
+
+
+LSTM model training
+ #lstm = model.fit(X_train, y_train, epochs=50, validation_split=0.25)
+lstm = model.fit(X_train, y_train, epochs=10, validation_data=(X_test, y_test))
+
+
+LSTM model evaluation
+plt.figure()
+plt.plot(lstm.history['binary_accuracy'])
+plt.plot(lstm.history['val_binary_accuracy'])
+plt.title('lstm model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'validation'])
+plt.show()
+
+
+plt.figure()
+plt.plot(lstm.history['loss'])
+plt.plot(lstm.history['val_loss'])
+plt.title('lstm model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'validation'])
+plt.show()
+
+
+
+loss, accuracy = model.evaluate(X_train, y_train)
+print("Train loss:", loss)
+print("Train accuracy:", accuracy)
+loss, accuracy = model.evaluate(X_test, y_test)
+print("Test loss:", loss)
+print("Test accuracy:", accuracy)
+
+
+
+evaluating LSTM on chimp data
+loss, accuracy = model.evaluate(chimp_sequences, chimp_labels)
+print("Test loss:", loss)
+print("Test accuracy:", accuracy)
+
+
+evaluating lstm on dog data
+loss, accuracy = model.evaluate(dog_sequences, dog_labels)
+print("Test loss:", loss)
+print("Test accuracy:", accuracy)
+
+
+
+Analysis
+Human data accuracy stats
+import numpy as np
+import matplotlib.pyplot as plt
+ 
+  
+# creating the dataset
+data = {'Logistic Regression':93.9,'KNN':82.4,'Decision Classifier':81.9,'SVM':91.3,'Random Forest':91.6, 'Navie Bayes':98.4, 'CNN':89.0,
+        'LSTM':85.0}
+courses = list(data.keys())
+values = list(data.values())  
+fig = plt.figure(figsize = (15, 5))
+# creating the bar plot0
+bar_plot=plt.bar(courses, values, color ='maroon',
+        width = 0.4)
+plt.bar_label(bar_plot,labels=values,label_type="center",color = 'white')
+plt.xlabel("Algorithms")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Performance on Human data")
+plt.show()
+
+
+chimp data accuracy stats
+# creating the dataset
+data = {'Logistic Regression':99.0,'KNN':94.2,'Decision Classifier':90.1,'SVM':98.5,'Random Forest':98.8, 'Navie Bayes':99.3, 'CNN':85.1,
+        'LSTM':85.0}
+courses = list(data.keys())
+values = list(data.values()) 
+fig = plt.figure(figsize = (15, 5))
+# creating the bar plot0
+bar_plot=plt.bar(courses, values, color ='maroon',
+        width = 0.4)
+plt.bar_label(bar_plot,labels=values,label_type="center",color = 'white') 
+plt.xlabel("Algorithms")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Performance on Chimpanzee data")
+plt.show()
+
+
+Dog accuracy stats
+# creating the dataset
+data = {'Logistic Regression':90.0,'KNN':47.3,'Decision Classifier':46.3,'SVM':79.7,'Random Forest':81.7, 'Navie Bayes':92.5, 'CNN':85.1,
+        'LSTM':85.0}
+courses = list(data.keys())
+values = list(data.values())
+fig = plt.figure(figsize = (15, 5)) 
+# creating the bar plot0
+bar_plot=plt.bar(courses, values, color ='maroon',
+        width = 0.4)
+plt.bar_label(bar_plot,labels=values,label_type="center",color = 'white') 
+plt.xlabel("Algorithms")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Performance on Dog data")
+plt.show()
+
+
+using logistic 
+# creating the dataset
+data = {'Human Data':93.9,'Chimpanzee Data':99.0,'Dog Data':90.0}
+courses = list(data.keys())
+values = list(data.values()) 
+fig = plt.figure(figsize = (5, 5))
+# creating the bar plot0
+plt.bar(courses, values, color ='purple',
+        width = 0.3)
+plt.xlabel("Datasets")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Performance using Logistic Regression ")
+plt.show()
+
+
+ accuracy performance using KNN 
+# creating the dataset
+data = {'Human Data':82.4,'Chimpanzee Data':94.2,'Dog Data':47.3}
+courses = list(data.keys())
+values = list(data.values()) 
+fig = plt.figure(figsize = (5, 5))
+# creating the bar plot0
+plt.bar(courses, values, color ='purple',
+        width = 0.3)
+plt.xlabel("Datasets")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Performance using KNN ")
+plt.show()
+
+using decsionsn tree
+# creating the dataset
+data = {'Human Data':81.9,'Chimpanzee Data':90.1,'Dog Data':46.3}
+courses = list(data.keys())
+values = list(data.values()) 
+fig = plt.figure(figsize = (5, 5))
+# creating the bar plot0
+plt.bar(courses, values, color ='purple',
+        width = 0.3)
+plt.xlabel("Datasets")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Performance using Decision Tree ")
+plt.show()
+
+using svm
+# creating the dataset
+data = {'Human Data':91.3,'Chimpanzee Data':98.5,'Dog Data':79.7}
+courses = list(data.keys())
+values = list(data.values())  
+fig = plt.figure(figsize = (5, 5))
+# creating the bar plot0
+plt.bar(courses, values, color ='purple',
+        width = 0.3)
+plt.xlabel("Datasets")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Performance using SVM")
+plt.show()
+
+using random forest
+# creating the dataset
+data = {'Human Data':91.6,'Chimpanzee Data':98.8,'Dog Data':81.7}
+courses = list(data.keys())
+values = list(data.values()) 
+fig = plt.figure(figsize = (5, 5))
+# creating the bar plot0
+plt.bar(courses, values, color ='purple',
+        width = 0.3)
+plt.xlabel("Datasets")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Performance using Random Forest")
+plt.show()
+
+using naive bayes
+# creating the dataset
+data = {'Human Data':98.4,'Chimpanzee Data':99.3,'Dog Data':92.5}
+courses = list(data.keys())
+values = list(data.values())
+fig = plt.figure(figsize = (5, 5))
+# creating the bar plot0
+plt.bar(courses, values, color ='purple',
+        width = 0.3)
+plt.xlabel("Datasets")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Performance using Naive Bayes")
+plt.show()
+
+using cnn
+# creating the dataset
+data = {'Human Data':89.0,'Chimpanzee Data':85.0,'Dog Data':85.0}
+courses = list(data.keys())
+values = list(data.values())
+fig = plt.figure(figsize = (5, 5))
+# creating the bar plot0
+plt.bar(courses, values, color ='purple',
+        width = 0.3)
+plt.xlabel("Datasets")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Performance using CNN")
+plt.show()
+
+using lstm
+# creating the dataset
+data = {'Human Data':85.0,'Chimpanzee Data':85.0,'Dog Data':85.0}
+courses = list(data.keys())
+values = list(data.values())
+fig = plt.figure(figsize = (5, 5))
+# creating the bar plot0
+plt.bar(courses, values, color ='purple',
+        width = 0.3)
+plt.xlabel("Datasets")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Performance using LSTM ")
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
